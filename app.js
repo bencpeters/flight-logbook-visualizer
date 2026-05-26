@@ -842,9 +842,17 @@
         });
 
         document.getElementById('btn-sample-data').addEventListener('click', () => {
-            fetch('sample_data.csv')
-                .then(r => r.text())
-                .then(csv => loadCsvData(csv));
+            const btn = document.getElementById('btn-sample-data');
+            btn.textContent = 'Loading...';
+            fetch(new URL('sample_data.csv', window.location.href).href)
+                .then(r => {
+                    if (!r.ok) throw new Error('Failed to load sample data');
+                    return r.text();
+                })
+                .then(csv => loadCsvData(csv))
+                .catch(() => {
+                    btn.textContent = 'Failed to load — try uploading a file instead';
+                });
         });
     }
 
