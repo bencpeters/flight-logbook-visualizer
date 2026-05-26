@@ -1,0 +1,577 @@
+(function () {
+    'use strict';
+
+    let flights = [];
+    let aircraft = {};
+    let filteredFlights = [];
+    let map, routeLayer, markerLayer;
+    let chart = null;
+    let sortColumn = 'date';
+    let sortDirection = -1;
+
+    // Color scale: old flights = cool blue, recent = warm orange/red
+    function flightRecencyColor(date, minDate, maxDate) {
+        const range = maxDate - minDate || 1;
+        const t = (date - minDate) / range;
+        const r = Math.round(40 + t * 215);
+        const g = Math.round(80 + (1 - Math.abs(t - 0.5) * 2) * 80);
+        const b = Math.round(220 - t * 180);
+        return `rgb(${r},${g},${b})`;
+    }
+
+    function routeWeight(count) {
+        return Math.min(2 + Math.log2(count) * 2, 8);
+    }
+
+    // --- CSV Parsing ---
+    function parseForeFlight(csvText) {
+        const lines = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+        let flightsStart = -1;
+        let aircraftStart = -1;
+
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith('Aircraft Table')) aircraftStart = i + 1;
+            if (lines[i].startsWith('Flights Table')) { flightsStart = i + 1; break; }
+        }
+
+        // Parse aircraft
+        if (aircraftStart > 0) {
+            const acSection = lines.slice(aircraftStart, flightsStart - 2).join('\n');
+            const acParsed = Papa.parse(acSection, { header: true, skipEmptyLines: true });
+            acParsed.data.forEach(row => {
+                if (row.AircraftID) {
+                    aircraft[row.AircraftID] = {
+                        type: row.TypeCode || '',
+                        make: row.Make || '',
+                        model: row.Model || '',
+                        gear: row.GearType || '',
+                        engine: row.EngineType || ''
+                    };
+                }
+            });
+        }
+
+        // Parse flights
+        const flightSection = lines.slice(flightsStart).join('\n');
+        const flightParsed = Papa.parse(flightSection, { header: true, skipEmptyLines: true });
+
+        flights = flightParsed.data
+            .filter(row => row.Date && row.Date.match(/^\d{4}/))
+            .map((row, idx) => ({
+                id: idx,
+                date: row.Date,
+                aircraft: row.AircraftID || '',
+                from: (row.From || '').trim(),
+                to: (row.To || '').trim(),
+                route: (row.Route || '').trim(),
+                totalTime: parseFloat(row.TotalTime) || 0,
+                pic: parseFloat(row.PIC) || 0,
+                night: parseFloat(row.Night) || 0,
+                solo: parseFloat(row.Solo) || 0,
+                crossCountry: parseFloat(row.CrossCountry) || 0,
+                actualInstrument: parseFloat(row.ActualInstrument) || 0,
+                simulatedInstrument: parseFloat(row.SimulatedInstrument) || 0,
+                dualGiven: parseFloat(row.DualGiven) || 0,
+                dualReceived: parseFloat(row.DualReceived) || 0,
+                distance: parseFloat(row.Distance) || 0,
+                instructor: row.InstructorName || '',
+                comments: (row.PilotComments || '').replace(/^"|"$/g, '').replace(/""/g, '"'),
+                landings: parseInt(row.AllLandings) || 0
+            }));
+
+        filteredFlights = [...flights];
+    }
+
+    // --- Map Setup ---
+    function initMap() {
+        map = L.map('map', { zoomControl: true }).setView([42, -110], 5);
+
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+        });
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; Esri',
+            maxZoom: 19
+        });
+
+        const terrainLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenTopoMap',
+            maxZoom: 17
+        });
+
+        const vfrSectionalLayer = L.tileLayer('https://wms.chartbundle.com/tms/1.0.0/sec/{z}/{x}/{y}.png?origin=nw', {
+            attribution: 'ChartBundle VFR Sectionals',
+            maxZoom: 13,
+            minZoom: 5,
+            tms: false
+        });
+
+        const ifrEnrouteLayer = L.tileLayer('https://wms.chartbundle.com/tms/1.0.0/enrl/{z}/{x}/{y}.png?origin=nw', {
+            attribution: 'ChartBundle IFR Enroute Low',
+            maxZoom: 13,
+            minZoom: 5,
+            tms: false
+        });
+
+        osmLayer.addTo(map);
+
+        L.control.layers({
+            'Roads (OSM)': osmLayer,
+            'Satellite': satelliteLayer,
+            'Terrain': terrainLayer,
+            'VFR Sectionals': vfrSectionalLayer,
+            'IFR Enroute Low': ifrEnrouteLayer
+        }, null, { position: 'topleft' }).addTo(map);
+
+        routeLayer = L.layerGroup().addTo(map);
+        markerLayer = L.layerGroup().addTo(map);
+    }
+
+    // --- Route Plotting ---
+    function getAirportCoords(id) {
+        if (!id) return null;
+        const normalized = id.toUpperCase().trim();
+        if (AIRPORTS[normalized]) return AIRPORTS[normalized];
+        if (normalized.length <= 3 && AIRPORTS['K' + normalized]) return AIRPORTS['K' + normalized];
+        if (normalized.startsWith('K') && AIRPORTS[normalized.substring(1)]) return AIRPORTS[normalized.substring(1)];
+        return null;
+    }
+
+    function greatCirclePoints(lat1, lng1, lat2, lng2, numPoints) {
+        if (numPoints === undefined) numPoints = 20;
+        const toRad = Math.PI / 180;
+        const toDeg = 180 / Math.PI;
+        const points = [];
+        const phi1 = lat1 * toRad, lam1 = lng1 * toRad;
+        const phi2 = lat2 * toRad, lam2 = lng2 * toRad;
+
+        for (let i = 0; i <= numPoints; i++) {
+            const f = i / numPoints;
+            const d = Math.acos(Math.sin(phi1) * Math.sin(phi2) + Math.cos(phi1) * Math.cos(phi2) * Math.cos(lam2 - lam1));
+            if (d < 0.0001) { points.push([lat1, lng1]); continue; }
+            const A = Math.sin((1 - f) * d) / Math.sin(d);
+            const B = Math.sin(f * d) / Math.sin(d);
+            const x = A * Math.cos(phi1) * Math.cos(lam1) + B * Math.cos(phi2) * Math.cos(lam2);
+            const y = A * Math.cos(phi1) * Math.sin(lam1) + B * Math.cos(phi2) * Math.sin(lam2);
+            const z = A * Math.sin(phi1) + B * Math.sin(phi2);
+            points.push([Math.atan2(z, Math.sqrt(x * x + y * y)) * toDeg, Math.atan2(y, x) * toDeg]);
+        }
+        return points;
+    }
+
+    function buildRouteKey(from, to) {
+        const pair = [from, to].sort();
+        return pair[0] + '-' + pair[1];
+    }
+
+    function plotRoutes() {
+        routeLayer.clearLayers();
+        markerLayer.clearLayers();
+
+        const routeGroups = {};
+        const airportsUsed = {};
+        const dates = filteredFlights.filter(f => f.date).map(f => new Date(f.date).getTime());
+        const minDate = Math.min(...dates);
+        const maxDate = Math.max(...dates);
+
+        filteredFlights.forEach(flight => {
+            const waypoints = [];
+            const fromCoords = getAirportCoords(flight.from);
+            const toCoords = getAirportCoords(flight.to);
+
+            if (flight.from && fromCoords) airportsUsed[flight.from] = fromCoords;
+            if (flight.to && toCoords) airportsUsed[flight.to] = toCoords;
+
+            // Build waypoint list from route or from/to
+            if (flight.route) {
+                const routeParts = flight.route.split(/\s+/).filter(Boolean);
+                for (const wp of routeParts) {
+                    const c = getAirportCoords(wp);
+                    if (c) {
+                        waypoints.push({ id: wp, lat: c.lat, lng: c.lng });
+                        airportsUsed[wp] = c;
+                    }
+                }
+            } else if (flight.from && flight.to && flight.from !== flight.to) {
+                if (fromCoords) waypoints.push({ id: flight.from, lat: fromCoords.lat, lng: fromCoords.lng });
+                if (toCoords) waypoints.push({ id: flight.to, lat: toCoords.lat, lng: toCoords.lng });
+            }
+
+            // Create route segments
+            for (let i = 0; i < waypoints.length - 1; i++) {
+                const segKey = buildRouteKey(waypoints[i].id, waypoints[i + 1].id);
+                if (!routeGroups[segKey]) {
+                    routeGroups[segKey] = { from: waypoints[i], to: waypoints[i + 1], flights: [] };
+                }
+                routeGroups[segKey].flights.push(flight);
+            }
+        });
+
+        // Draw routes
+        Object.values(routeGroups).forEach(group => {
+            const mostRecent = Math.max(...group.flights.map(f => new Date(f.date).getTime()));
+            const color = flightRecencyColor(mostRecent, minDate, maxDate);
+            const weight = routeWeight(group.flights.length);
+            const points = greatCirclePoints(group.from.lat, group.from.lng, group.to.lat, group.to.lng);
+
+            const polyline = L.polyline(points, {
+                color: color,
+                weight: weight,
+                opacity: 0.7
+            });
+
+            polyline.on('click', () => showFlightDetail(group));
+            polyline.on('mouseover', function () { this.setStyle({ opacity: 1, weight: weight + 2 }); });
+            polyline.on('mouseout', function () { this.setStyle({ opacity: 0.7, weight: weight }); });
+
+            routeLayer.addLayer(polyline);
+        });
+
+        // Draw airport markers
+        Object.entries(airportsUsed).forEach(([id, coords]) => {
+            const marker = L.circleMarker([coords.lat, coords.lng], {
+                radius: 5,
+                fillColor: '#fff',
+                fillOpacity: 0.9,
+                color: '#333',
+                weight: 1.5
+            });
+            marker.bindTooltip(coords.name || id, { direction: 'top', offset: [0, -8] });
+            markerLayer.addLayer(marker);
+        });
+
+        // Fit bounds
+        if (Object.keys(airportsUsed).length > 0) {
+            const bounds = Object.values(airportsUsed).map(c => [c.lat, c.lng]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+    }
+
+    // --- Flight Detail ---
+    function showFlightDetail(routeGroup) {
+        const panel = document.getElementById('flight-detail');
+        const content = document.getElementById('detail-content');
+        panel.classList.remove('hidden');
+
+        const fromName = routeGroup.from.id;
+        const toName = routeGroup.to.id;
+        const flightList = routeGroup.flights
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 20);
+
+        let html = `<h3>${fromName} &harr; ${toName}</h3>`;
+        html += `<div class="multi-flight-header">${routeGroup.flights.length} flight${routeGroup.flights.length > 1 ? 's' : ''} on this segment</div>`;
+
+        flightList.forEach(f => {
+            html += `<div class="flight-item">`;
+            html += `<div class="detail-row"><span class="label">Date</span><span class="value">${f.date}</span></div>`;
+            html += `<div class="detail-row"><span class="label">Aircraft</span><span class="value">${f.aircraft}</span></div>`;
+            html += `<div class="detail-row"><span class="label">Route</span><span class="value">${f.from} → ${f.route || f.to} → ${f.to}</span></div>`;
+            html += `<div class="detail-row"><span class="label">Total Time</span><span class="value">${f.totalTime}h</span></div>`;
+            if (f.comments) html += `<div class="flight-comment">${f.comments}</div>`;
+            html += `</div>`;
+        });
+
+        if (routeGroup.flights.length > 20) {
+            html += `<div class="multi-flight-header">...and ${routeGroup.flights.length - 20} more</div>`;
+        }
+
+        content.innerHTML = html;
+    }
+
+    // --- Table ---
+    function renderTable() {
+        const tbody = document.querySelector('#flights-table tbody');
+        const sorted = [...filteredFlights].sort((a, b) => {
+            let va = a[sortColumn], vb = b[sortColumn];
+            if (sortColumn === 'totalTime') return (va - vb) * sortDirection;
+            if (typeof va === 'string') return va.localeCompare(vb) * sortDirection;
+            return (va - vb) * sortDirection;
+        });
+
+        tbody.innerHTML = sorted.map(f => `
+            <tr data-id="${f.id}">
+                <td>${f.date}</td>
+                <td title="${aircraft[f.aircraft] ? aircraft[f.aircraft].model : ''}">${f.aircraft}</td>
+                <td>${f.from}</td>
+                <td>${f.to}</td>
+                <td title="${f.route}">${f.route || '-'}</td>
+                <td>${f.totalTime || '-'}</td>
+                <td title="${f.comments}">${f.comments || ''}</td>
+            </tr>
+        `).join('');
+    }
+
+    // --- Graph ---
+    function renderGraph(type) {
+        const ctx = document.getElementById('hours-chart');
+        if (chart) chart.destroy();
+
+        const sorted = [...filteredFlights].filter(f => f.totalTime > 0).sort((a, b) => a.date.localeCompare(b.date));
+
+        if (type === 'cumulative') {
+            let cumulative = 0;
+            const data = sorted.map(f => {
+                cumulative += f.totalTime;
+                return { x: f.date, y: Math.round(cumulative * 10) / 10 };
+            });
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Total Hours',
+                        data: data,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,0.1)',
+                        fill: true,
+                        pointRadius: 1,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { type: 'category', title: { display: true, text: 'Date' }, ticks: { maxTicksLimit: 12 } },
+                        y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        } else {
+            // Monthly bar chart
+            const monthly = {};
+            sorted.forEach(f => {
+                const month = f.date.substring(0, 7);
+                monthly[month] = (monthly[month] || 0) + f.totalTime;
+            });
+
+            const labels = Object.keys(monthly).sort();
+            const values = labels.map(m => Math.round(monthly[m] * 10) / 10);
+
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Hours',
+                        data: values,
+                        backgroundColor: '#2563eb',
+                        borderRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Month' }, ticks: { maxTicksLimit: 18 } },
+                        y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+    }
+
+    // --- Stats ---
+    function renderStats() {
+        const content = document.getElementById('stats-content');
+        const totalHours = filteredFlights.reduce((s, f) => s + f.totalTime, 0);
+        const picHours = filteredFlights.reduce((s, f) => s + f.pic, 0);
+        const nightHours = filteredFlights.reduce((s, f) => s + f.night, 0);
+        const xcHours = filteredFlights.reduce((s, f) => s + f.crossCountry, 0);
+        const ifrHours = filteredFlights.reduce((s, f) => s + f.actualInstrument, 0);
+        const simIfrHours = filteredFlights.reduce((s, f) => s + f.simulatedInstrument, 0);
+        const dualGivenHours = filteredFlights.reduce((s, f) => s + f.dualGiven, 0);
+        const soloHours = filteredFlights.reduce((s, f) => s + f.solo, 0);
+        const totalLandings = filteredFlights.reduce((s, f) => s + f.landings, 0);
+        const uniqueAirports = new Set();
+        filteredFlights.forEach(f => { if (f.from) uniqueAirports.add(f.from); if (f.to) uniqueAirports.add(f.to); });
+        const uniqueAircraft = new Set(filteredFlights.map(f => f.aircraft).filter(Boolean));
+
+        content.innerHTML = `
+            <div class="stat-card"><div class="label">Total Flights</div><div class="value">${filteredFlights.length}</div></div>
+            <div class="stat-card"><div class="label">Total Hours</div><div class="value">${totalHours.toFixed(1)}</div></div>
+            <div class="stat-card"><div class="label">PIC Hours</div><div class="value">${picHours.toFixed(1)}</div></div>
+            <div class="stat-card"><div class="label">Night Hours</div><div class="value">${nightHours.toFixed(1)}</div></div>
+            <div class="stat-card"><div class="label">Cross-Country</div><div class="value">${xcHours.toFixed(1)}</div></div>
+            <div class="stat-card"><div class="label">Actual IFR</div><div class="value">${ifrHours.toFixed(1)}</div></div>
+            <div class="stat-card"><div class="label">Sim Instrument</div><div class="value">${simIfrHours.toFixed(1)}</div></div>
+            <div class="stat-card"><div class="label">Solo</div><div class="value">${soloHours.toFixed(1)}</div></div>
+            <div class="stat-card"><div class="label">Dual Given</div><div class="value">${dualGivenHours.toFixed(1)}</div></div>
+            <div class="stat-card"><div class="label">Total Landings</div><div class="value">${totalLandings}</div></div>
+            <div class="stat-card"><div class="label">Airports Visited</div><div class="value">${uniqueAirports.size}</div></div>
+            <div class="stat-card"><div class="label">Aircraft Flown</div><div class="value">${uniqueAircraft.size}</div></div>
+        `;
+    }
+
+    // --- Filters ---
+    function populateFilters() {
+        const aircraftSelect = document.getElementById('filter-aircraft');
+        const airportSelect = document.getElementById('filter-airport');
+
+        const acIds = [...new Set(flights.map(f => f.aircraft).filter(Boolean))].sort();
+        aircraftSelect.innerHTML = acIds.map(id => `<option value="${id}">${id}${aircraft[id] ? ' (' + aircraft[id].type + ')' : ''}</option>`).join('');
+
+        const airports = new Set();
+        flights.forEach(f => { if (f.from) airports.add(f.from); if (f.to) airports.add(f.to); });
+        const apSorted = [...airports].sort();
+        airportSelect.innerHTML = apSorted.map(id => `<option value="${id}">${id}</option>`).join('');
+
+        // Date range defaults
+        const dates = flights.map(f => f.date).filter(Boolean).sort();
+        document.getElementById('filter-date-from').value = dates[0] || '';
+        document.getElementById('filter-date-to').value = dates[dates.length - 1] || '';
+    }
+
+    function applyFilters() {
+        const dateFrom = document.getElementById('filter-date-from').value;
+        const dateTo = document.getElementById('filter-date-to').value;
+        const selAircraft = [...document.getElementById('filter-aircraft').selectedOptions].map(o => o.value);
+        const selAirports = [...document.getElementById('filter-airport').selectedOptions].map(o => o.value);
+        const typeChecks = [...document.querySelectorAll('#filter-type input:checked')].map(cb => cb.value);
+
+        filteredFlights = flights.filter(f => {
+            if (dateFrom && f.date < dateFrom) return false;
+            if (dateTo && f.date > dateTo) return false;
+            if (selAircraft.length && !selAircraft.includes(f.aircraft)) return false;
+            if (selAirports.length && !selAirports.includes(f.from) && !selAirports.includes(f.to)) return false;
+            if (typeChecks.length) {
+                const pass = typeChecks.some(t => {
+                    switch (t) {
+                        case 'solo': return f.solo > 0;
+                        case 'xc': return f.crossCountry > 0;
+                        case 'night': return f.night > 0;
+                        case 'ifr': return f.actualInstrument > 0;
+                        case 'simInstrument': return f.simulatedInstrument > 0;
+                        case 'dualGiven': return f.dualGiven > 0;
+                        case 'dualReceived': return f.dualReceived > 0;
+                        case 'pic': return f.pic > 0;
+                        default: return true;
+                    }
+                });
+                if (!pass) return false;
+            }
+            return true;
+        });
+
+        updateAll();
+        const summary = document.getElementById('filter-summary');
+        summary.textContent = `Showing ${filteredFlights.length} of ${flights.length} flights (${filteredFlights.reduce((s, f) => s + f.totalTime, 0).toFixed(1)} hours)`;
+    }
+
+    function clearFilters() {
+        document.getElementById('filter-aircraft').selectedIndex = -1;
+        document.getElementById('filter-airport').selectedIndex = -1;
+        document.querySelectorAll('#filter-type input').forEach(cb => cb.checked = false);
+        const dates = flights.map(f => f.date).filter(Boolean).sort();
+        document.getElementById('filter-date-from').value = dates[0] || '';
+        document.getElementById('filter-date-to').value = dates[dates.length - 1] || '';
+        filteredFlights = [...flights];
+        updateAll();
+        document.getElementById('filter-summary').textContent = '';
+    }
+
+    function updateAll() {
+        plotRoutes();
+        renderTable();
+        renderStats();
+        const activeGraph = document.querySelector('.graph-controls .btn-sm.active');
+        if (activeGraph) renderGraph(activeGraph.dataset.graph);
+    }
+
+    // --- UI Wiring ---
+    function setupUI() {
+        // Sidebar toggle
+        document.getElementById('sidebar-toggle').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('open');
+            setTimeout(() => map.invalidateSize(), 350);
+        });
+
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+                if (tab.dataset.tab === 'graph') {
+                    const activeGraph = document.querySelector('.graph-controls .btn-sm.active');
+                    renderGraph(activeGraph ? activeGraph.dataset.graph : 'cumulative');
+                }
+            });
+        });
+
+        // Graph toggle
+        document.querySelectorAll('.graph-controls .btn-sm').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.graph-controls .btn-sm').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderGraph(btn.dataset.graph);
+            });
+        });
+
+        // Table sorting
+        document.querySelectorAll('#flights-table th').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.dataset.sort;
+                if (sortColumn === col) sortDirection *= -1;
+                else { sortColumn = col; sortDirection = col === 'date' ? -1 : 1; }
+                renderTable();
+            });
+        });
+
+        // Filters
+        document.getElementById('apply-filters').addEventListener('click', applyFilters);
+        document.getElementById('clear-filters').addEventListener('click', clearFilters);
+
+        // Close detail
+        document.getElementById('close-detail').addEventListener('click', () => {
+            document.getElementById('flight-detail').classList.add('hidden');
+        });
+    }
+
+    // --- File Upload ---
+    function setupUpload() {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) loadFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) loadFile(e.target.files[0]);
+        });
+    }
+
+    function loadFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            parseForeFlight(e.target.result);
+            document.getElementById('upload-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            initMap();
+            setupUI();
+            populateFilters();
+            updateAll();
+        };
+        reader.readAsText(file);
+    }
+
+    // --- Init ---
+    setupUpload();
+})();
