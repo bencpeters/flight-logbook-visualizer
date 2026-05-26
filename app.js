@@ -757,6 +757,11 @@
 
         sidebar.addEventListener('touchstart', (e) => {
             if (window.innerWidth > 768 || !sidebar.classList.contains('open')) return;
+            // Don't initiate swipe if touching a scrollable panel that has scroll content
+            const panel = e.target.closest('.tab-panel');
+            if (panel && panel.scrollTop > 0) { touchStartY = null; return; }
+            const scrollable = e.target.closest('.table-container');
+            if (scrollable && scrollable.scrollTop > 0) { touchStartY = null; return; }
             touchStartY = e.touches[0].clientY;
             touchCurrentY = touchStartY;
         }, { passive: true });
@@ -765,9 +770,15 @@
             if (touchStartY === null) return;
             touchCurrentY = e.touches[0].clientY;
             const dy = touchCurrentY - touchStartY;
+            // Only start dragging the drawer if swiping down
             if (dy > 0) {
                 sidebar.style.transition = 'none';
                 sidebar.style.transform = `translateY(${dy}px)`;
+            } else {
+                // Swiping up — cancel drawer gesture, let content scroll
+                touchStartY = null;
+                sidebar.style.transition = '';
+                sidebar.style.transform = '';
             }
         }, { passive: true });
 
