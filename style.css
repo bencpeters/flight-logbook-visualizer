@@ -46,6 +46,23 @@ body {
     font-style: italic;
 }
 
+.btn-sample {
+    margin-top: 1.5rem;
+    padding: 10px 20px;
+    background: transparent;
+    border: 1px solid #4a90d9;
+    border-radius: 6px;
+    color: #7ab0e0;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-sample:hover {
+    background: rgba(74, 144, 217, 0.15);
+    border-color: #7ab0e0;
+}
+
 #drop-zone {
     border: 2px dashed #4a90d9;
     border-radius: 12px;

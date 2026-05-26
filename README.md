@@ -21,6 +21,8 @@ Then open http://localhost:8080 in your browser.
 2. Drop the CSV file onto the upload screen (or click to browse)
 3. Your data is cached in the browser's localStorage — no need to re-upload on subsequent visits
 
+Or click "Try with sample data" to explore the app with a synthetic dataset (254 flights over 2020-2024, based in Boise, ID).
+
 ## Features
 
 - **Map** — Interactive Leaflet map with multiple basemaps (OSM, Satellite, Terrain, VFR Sectionals, VFR Terminal, IFR Low Enroute)

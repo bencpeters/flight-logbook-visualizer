@@ -840,6 +840,12 @@
         fileInput.addEventListener('change', (e) => {
             if (e.target.files[0]) loadFile(e.target.files[0]);
         });
+
+        document.getElementById('btn-sample-data').addEventListener('click', () => {
+            fetch('sample_data.csv')
+                .then(r => r.text())
+                .then(csv => loadCsvData(csv));
+        });
     }
 
     function loadFile(file) {
