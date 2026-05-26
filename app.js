@@ -101,18 +101,16 @@
             maxZoom: 17
         });
 
-        const vfrSectionalLayer = L.tileLayer('https://wms.chartbundle.com/tms/1.0.0/sec/{z}/{x}/{y}.png?origin=nw', {
-            attribution: 'ChartBundle VFR Sectionals',
-            maxZoom: 13,
-            minZoom: 5,
-            tms: false
+        const vfrSectionalLayer = L.tileLayer('https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/US_VFR_Sectional_Charts/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'FAA / ArcGIS',
+            maxZoom: 12,
+            minZoom: 4
         });
 
-        const ifrEnrouteLayer = L.tileLayer('https://wms.chartbundle.com/tms/1.0.0/enrl/{z}/{x}/{y}.png?origin=nw', {
-            attribution: 'ChartBundle IFR Enroute Low',
-            maxZoom: 13,
-            minZoom: 5,
-            tms: false
+        const ifrEnrouteLayer = L.tileLayer('https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/US_IFR_Enroute_Low_Charts/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'FAA / ArcGIS',
+            maxZoom: 12,
+            minZoom: 4
         });
 
         osmLayer.addTo(map);
@@ -173,8 +171,8 @@
         const routeGroups = {};
         const airportsUsed = {};
         const dates = filteredFlights.filter(f => f.date).map(f => new Date(f.date).getTime());
-        const minDate = Math.min(...dates);
-        const maxDate = Math.max(...dates);
+        const minDate = dates.length ? Math.min(...dates) : 0;
+        const maxDate = dates.length ? Math.max(...dates) : 1;
 
         filteredFlights.forEach(flight => {
             const waypoints = [];
@@ -265,10 +263,11 @@
         html += `<div class="multi-flight-header">${routeGroup.flights.length} flight${routeGroup.flights.length > 1 ? 's' : ''} on this segment</div>`;
 
         flightList.forEach(f => {
+            const routeDisplay = f.route ? f.route : `${f.from} → ${f.to}`;
             html += `<div class="flight-item">`;
             html += `<div class="detail-row"><span class="label">Date</span><span class="value">${f.date}</span></div>`;
             html += `<div class="detail-row"><span class="label">Aircraft</span><span class="value">${f.aircraft}</span></div>`;
-            html += `<div class="detail-row"><span class="label">Route</span><span class="value">${f.from} → ${f.route || f.to} → ${f.to}</span></div>`;
+            html += `<div class="detail-row"><span class="label">Route</span><span class="value">${routeDisplay}</span></div>`;
             html += `<div class="detail-row"><span class="label">Total Time</span><span class="value">${f.totalTime}h</span></div>`;
             if (f.comments) html += `<div class="flight-comment">${f.comments}</div>`;
             html += `</div>`;
