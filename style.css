@@ -101,7 +101,7 @@ body {
     transform: translateX(100%);
 }
 
-#mobile-close-btn {
+#mobile-drag-bar {
     display: none;
 }
 
@@ -633,6 +633,28 @@ select[multiple] {
         display: none;
     }
 
+    /* Drag bar - tap to close */
+    #mobile-drag-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 0 4px;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    #mobile-drag-bar span {
+        display: block;
+        width: 36px;
+        height: 4px;
+        background: #ccc;
+        border-radius: 2px;
+    }
+
+    #sidebar:not(.open) #mobile-drag-bar {
+        display: none;
+    }
+
     /* Tab bar always visible at bottom */
     .tabs {
         order: -1;
@@ -649,26 +671,6 @@ select[multiple] {
 
     #sidebar:not(.open) #data-toolbar {
         display: none;
-    }
-
-    #sidebar:not(.open) #mobile-close-btn {
-        display: none;
-    }
-
-    /* Mobile close button */
-    #mobile-close-btn {
-        display: block;
-        position: absolute;
-        top: 8px;
-        right: 12px;
-        border: none;
-        background: none;
-        font-size: 1.6rem;
-        cursor: pointer;
-        color: #555;
-        z-index: 10;
-        line-height: 1;
-        padding: 4px 8px;
     }
 
     #flight-detail {

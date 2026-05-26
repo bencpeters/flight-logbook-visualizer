@@ -705,8 +705,8 @@
             });
         });
 
-        // Mobile close button
-        document.getElementById('mobile-close-btn').addEventListener('click', () => {
+        // Mobile drag bar - tap to close
+        document.getElementById('mobile-drag-bar').addEventListener('click', () => {
             document.getElementById('sidebar').classList.remove('open');
             setTimeout(() => map.invalidateSize(), 350);
         });
