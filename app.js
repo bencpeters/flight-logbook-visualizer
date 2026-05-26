@@ -353,15 +353,18 @@
             } else if (event.type === 'mousemove' && ds.dragging) {
                 ds.endX = Math.max(area.left, Math.min(event.x, area.right));
                 chart.draw();
-            } else if (event.type === 'mouseup' && ds.dragging) {
+            } else if ((event.type === 'mouseup' || event.type === 'mouseleave') && ds.dragging) {
                 ds.dragging = false;
+                if (event.type === 'mouseleave') {
+                    ds.endX = Math.max(area.left, Math.min(event.x || ds.endX, area.right));
+                }
                 const minX = Math.min(ds.startX, ds.endX);
                 const maxX = Math.max(ds.startX, ds.endX);
                 if (maxX - minX > 10) {
                     const scale = chart.scales.x;
                     const minVal = scale.getValueForPixel(minX);
                     const maxVal = scale.getValueForPixel(maxX);
-                    applyDateFilterFromChart(minVal, maxVal, scale.type);
+                    applyDateFilterFromChart(minVal, maxVal);
                 }
                 ds.startX = null;
                 ds.endX = null;
@@ -384,7 +387,7 @@
         }
     };
 
-    function applyDateFilterFromChart(minVal, maxVal, scaleType) {
+    function applyDateFilterFromChart(minVal, maxVal) {
         const fromDate = new Date(minVal).toISOString().substring(0, 10);
         const toDate = new Date(maxVal).toISOString().substring(0, 10);
         document.getElementById('filter-date-from').value = fromDate;
@@ -392,9 +395,33 @@
         applyFilters();
     }
 
+    function updateGraphDateIndicator() {
+        const indicator = document.getElementById('graph-date-indicator');
+        if (!indicator) return;
+        const allDates = flights.map(f => f.date).filter(Boolean).sort();
+        const fullFrom = allDates[0];
+        const fullTo = allDates[allDates.length - 1];
+        const currentFrom = document.getElementById('filter-date-from').value;
+        const currentTo = document.getElementById('filter-date-to').value;
+        const isFiltered = currentFrom > fullFrom || currentTo < fullTo;
+        if (isFiltered) {
+            indicator.innerHTML = `<span>Showing: <strong>${currentFrom}</strong> to <strong>${currentTo}</strong></span><button id="graph-reset-dates" class="btn btn-sm">Reset dates</button>`;
+            indicator.classList.add('active');
+            document.getElementById('graph-reset-dates').addEventListener('click', () => {
+                document.getElementById('filter-date-from').value = fullFrom;
+                document.getElementById('filter-date-to').value = fullTo;
+                applyFilters();
+            });
+        } else {
+            indicator.innerHTML = '';
+            indicator.classList.remove('active');
+        }
+    }
+
     function renderGraphs() {
         if (cumulativeChart) cumulativeChart.destroy();
         if (monthlyChart) monthlyChart.destroy();
+        updateGraphDateIndicator();
 
         const sorted = [...filteredFlights].filter(f => f.totalTime > 0).sort((a, b) => a.date.localeCompare(b.date));
         if (sorted.length === 0) return;

@@ -321,6 +321,28 @@ select[multiple] {
 #flights-table tr.selected { background: #e8f0fe; }
 
 /* Graph */
+#graph-date-indicator {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+    color: #1e40af;
+}
+
+#graph-date-indicator.active {
+    display: flex;
+}
+
+#graph-date-indicator .btn-sm {
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
 .graph-hint {
     font-size: 0.75rem;
     color: #888;
