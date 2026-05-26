@@ -2,6 +2,10 @@
 
 A static web app for visualizing ForeFlight logbook exports on an interactive map with route plotting, filtering, and flight hour charts.
 
+## Live
+
+https://bencpeters.github.io/flight-logbook-visualizer/
+
 ## Running locally
 
 ```bash
