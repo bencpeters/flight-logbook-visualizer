@@ -477,8 +477,30 @@ select[multiple] {
 /* Map route styling is handled in JS */
 
 /* Leaflet overrides */
+.leaflet-control-container .leaflet-top.leaflet-left {
+    z-index: 1002;
+    position: relative;
+}
+
 .leaflet-control-layers {
-    max-width: 220px;
+    max-width: 250px;
+}
+
+.leaflet-control-layers-expanded {
+    padding: 8px 12px;
+}
+
+.leaflet-control-layers label {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+}
+
+.leaflet-control-layers input[type="radio"] {
+    cursor: pointer;
+    pointer-events: auto;
 }
 
 /* Responsive */
