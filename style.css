@@ -38,6 +38,14 @@ body {
     color: #a0a0b0;
 }
 
+.data-info {
+    display: block;
+    font-size: 0.8rem;
+    color: #8a9ab0;
+    margin-top: 0.75rem;
+    font-style: italic;
+}
+
 #drop-zone {
     border: 2px dashed #4a90d9;
     border-radius: 12px;

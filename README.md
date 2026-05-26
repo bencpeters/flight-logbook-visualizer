@@ -32,6 +32,10 @@ Then open http://localhost:8080 in your browser.
 - **Stats** — Summary cards (total hours, PIC, night, XC, IFR, landings, airports, aircraft)
 - **Resizable sidebar** — Drag the left edge to adjust width
 
+## Privacy
+
+Your logbook data never leaves your browser. The CSV is parsed client-side and cached in localStorage for convenience. No data is sent to any server.
+
 ## Data
 
 Airport coordinates are sourced from the OurAirports database (public domain), covering all US and Canadian airports. The lookup handles both ICAO (KEAT) and FAA (EAT) identifiers.
