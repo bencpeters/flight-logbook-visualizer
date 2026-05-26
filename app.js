@@ -101,16 +101,14 @@
             maxZoom: 17
         });
 
-        const vfrSectionalLayer = L.tileLayer('https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/US_VFR_Sectional_Charts/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'FAA / ArcGIS',
-            maxZoom: 12,
-            minZoom: 4
+        const esriTopoLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; Esri',
+            maxZoom: 19
         });
 
-        const ifrEnrouteLayer = L.tileLayer('https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/US_IFR_Enroute_Low_Charts/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'FAA / ArcGIS',
-            maxZoom: 12,
-            minZoom: 4
+        const cartoLightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CARTO',
+            maxZoom: 20
         });
 
         osmLayer.addTo(map);
@@ -119,8 +117,8 @@
             'Roads (OSM)': osmLayer,
             'Satellite': satelliteLayer,
             'Terrain': terrainLayer,
-            'VFR Sectionals': vfrSectionalLayer,
-            'IFR Enroute Low': ifrEnrouteLayer
+            'Esri Topo': esriTopoLayer,
+            'Light (CARTO)': cartoLightLayer
         }, null, { position: 'topleft' }).addTo(map);
 
         routeLayer = L.layerGroup().addTo(map);
