@@ -159,6 +159,15 @@
         return points;
     }
 
+    function sameAirport(a, b) {
+        if (!a || !b) return false;
+        a = a.toUpperCase().trim();
+        b = b.toUpperCase().trim();
+        if (a === b) return true;
+        const stripK = id => id.startsWith('K') && id.length === 4 ? id.substring(1) : id;
+        return stripK(a) === stripK(b);
+    }
+
     function buildRouteKey(from, to) {
         const pair = [from, to].sort();
         return pair[0] + '-' + pair[1];
@@ -185,7 +194,18 @@
             // Build waypoint list from route or from/to
             if (flight.route) {
                 const routeParts = flight.route.split(/\s+/).filter(Boolean);
-                for (const wp of routeParts) {
+                const allWpts = [...routeParts];
+
+                // Prepend From if route doesn't already start with it
+                if (flight.from && !sameAirport(flight.from, routeParts[0])) {
+                    allWpts.unshift(flight.from);
+                }
+                // Append To if route doesn't already end with it
+                if (flight.to && !sameAirport(flight.to, routeParts[routeParts.length - 1])) {
+                    allWpts.push(flight.to);
+                }
+
+                for (const wp of allWpts) {
                     const c = getAirportCoords(wp);
                     if (c) {
                         waypoints.push({ id: wp, lat: c.lat, lng: c.lng });
