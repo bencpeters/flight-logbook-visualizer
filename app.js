@@ -427,13 +427,14 @@
         if (airportsChart) { airportsChart.destroy(); airportsChart = null; }
         updateGraphDateIndicator();
 
+        const isMobile = window.innerWidth <= 768;
         const activePane = document.querySelector('.graph-subtab.active');
         const activeGraph = activePane ? activePane.dataset.graph : 'cumulative';
 
         const sorted = [...filteredFlights].filter(f => f.totalTime > 0).sort((a, b) => a.date.localeCompare(b.date));
         if (sorted.length === 0) return;
 
-        if (activeGraph === 'cumulative') {
+        if (!isMobile || activeGraph === 'cumulative') {
             let cumulative = 0;
             const cumulativeData = sorted.map(f => {
                 cumulative += f.totalTime;
@@ -472,7 +473,7 @@
             });
         }
 
-        if (activeGraph === 'monthly') {
+        if (!isMobile || activeGraph === 'monthly') {
             const monthly = {};
             sorted.forEach(f => {
                 const month = f.date.substring(0, 7) + '-01';
@@ -504,7 +505,7 @@
             });
         }
 
-        if (activeGraph === 'type') {
+        if (!isMobile || activeGraph === 'type') {
             const byType = {};
             filteredFlights.forEach(f => {
                 const t = getAircraftType(f.aircraft) || 'Unknown';
@@ -533,7 +534,7 @@
             });
         }
 
-        if (activeGraph === 'airports') {
+        if (!isMobile || activeGraph === 'airports') {
             const airportCounts = {};
             filteredFlights.forEach(f => {
                 if (f.from) airportCounts[f.from] = (airportCounts[f.from] || 0) + 1;

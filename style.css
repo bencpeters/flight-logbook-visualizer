@@ -401,11 +401,7 @@ select[multiple] {
 }
 
 .graph-subtabs {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 8px;
-    flex-shrink: 0;
-    flex-wrap: wrap;
+    display: none;
 }
 
 .graph-subtab {
@@ -426,13 +422,9 @@ select[multiple] {
 }
 
 .chart-pane {
-    display: none;
     flex: 1;
     min-height: 0;
     position: relative;
-}
-
-.chart-pane.active {
     display: flex;
     flex-direction: column;
 }
@@ -701,14 +693,26 @@ select[multiple] {
         height: 70px;
     }
 
-    /* Graph subtabs */
+    /* Graph subtabs - only show on mobile */
     .graph-subtabs {
+        display: flex;
         gap: 3px;
+        margin-bottom: 8px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
     }
 
     .graph-subtab {
         font-size: 0.7rem;
         padding: 4px 8px;
+    }
+
+    .chart-pane {
+        display: none;
+    }
+
+    .chart-pane.active {
+        display: flex;
     }
 
     /* Stats */
