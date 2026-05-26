@@ -333,6 +333,7 @@
     // --- Graph ---
     let cumulativeChart = null;
     let monthlyChart = null;
+    let typeChart = null;
 
     // Custom plugin for drag-to-select date range
     const dragSelectPlugin = {
@@ -506,6 +507,45 @@
             },
             plugins: [dragSelectPlugin]
         });
+
+        // Aircraft type chart
+        if (typeChart) typeChart.destroy();
+        const byType = {};
+        filteredFlights.forEach(f => {
+            const t = getAircraftType(f.aircraft) || 'Unknown';
+            byType[t] = (byType[t] || 0) + f.totalTime;
+        });
+        const typeLabels = Object.keys(byType).sort((a, b) => byType[b] - byType[a]);
+        const typeValues = typeLabels.map(t => Math.round(byType[t] * 10) / 10);
+        const typeColors = typeLabels.map((_, i) => {
+            const hue = (i * 137.5) % 360;
+            return `hsl(${hue}, 55%, 55%)`;
+        });
+
+        typeChart = new Chart(document.getElementById('type-chart'), {
+            type: 'doughnut',
+            data: {
+                labels: typeLabels,
+                datasets: [{
+                    data: typeValues,
+                    backgroundColor: typeColors,
+                    borderWidth: 1,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.label}: ${ctx.raw}h`
+                        }
+                    }
+                }
+            }
+        });
     }
 
     // --- Stats ---
@@ -541,12 +581,20 @@
     }
 
     // --- Filters ---
+    function getAircraftType(acId) {
+        return (aircraft[acId] && aircraft[acId].type) || '';
+    }
+
     function populateFilters() {
         const aircraftSelect = document.getElementById('filter-aircraft');
+        const aircraftTypeSelect = document.getElementById('filter-aircraft-type');
         const airportSelect = document.getElementById('filter-airport');
 
         const acIds = [...new Set(flights.map(f => f.aircraft).filter(Boolean))].sort();
         aircraftSelect.innerHTML = acIds.map(id => `<option value="${id}">${id}${aircraft[id] ? ' (' + aircraft[id].type + ')' : ''}</option>`).join('');
+
+        const types = [...new Set(acIds.map(id => getAircraftType(id)).filter(Boolean))].sort();
+        aircraftTypeSelect.innerHTML = types.map(t => `<option value="${t}">${t}</option>`).join('');
 
         const airports = new Set();
         flights.forEach(f => { if (f.from) airports.add(f.from); if (f.to) airports.add(f.to); });
@@ -563,6 +611,7 @@
         const dateFrom = document.getElementById('filter-date-from').value;
         const dateTo = document.getElementById('filter-date-to').value;
         const selAircraft = [...document.getElementById('filter-aircraft').selectedOptions].map(o => o.value);
+        const selAircraftTypes = [...document.getElementById('filter-aircraft-type').selectedOptions].map(o => o.value);
         const selAirports = [...document.getElementById('filter-airport').selectedOptions].map(o => o.value);
         const typeChecks = [...document.querySelectorAll('#filter-type input:checked')].map(cb => cb.value);
 
@@ -570,6 +619,7 @@
             if (dateFrom && f.date < dateFrom) return false;
             if (dateTo && f.date > dateTo) return false;
             if (selAircraft.length && !selAircraft.includes(f.aircraft)) return false;
+            if (selAircraftTypes.length && !selAircraftTypes.includes(getAircraftType(f.aircraft))) return false;
             if (selAirports.length && !selAirports.includes(f.from) && !selAirports.includes(f.to)) return false;
             if (typeChecks.length) {
                 const pass = typeChecks.some(t => {
@@ -597,6 +647,7 @@
 
     function clearFilters() {
         document.getElementById('filter-aircraft').selectedIndex = -1;
+        document.getElementById('filter-aircraft-type').selectedIndex = -1;
         document.getElementById('filter-airport').selectedIndex = -1;
         document.querySelectorAll('#filter-type input').forEach(cb => cb.checked = false);
         const dates = flights.map(f => f.date).filter(Boolean).sort();
@@ -652,6 +703,27 @@
         // Close detail
         document.getElementById('close-detail').addEventListener('click', () => {
             document.getElementById('flight-detail').classList.add('hidden');
+        });
+
+        // Sidebar resize
+        const sidebar = document.getElementById('sidebar');
+        const resizeHandle = document.getElementById('sidebar-resize-handle');
+        let resizing = false;
+        resizeHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            resizing = true;
+            document.body.classList.add('sidebar-resizing');
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!resizing) return;
+            const newWidth = Math.max(300, Math.min(window.innerWidth - 200, window.innerWidth - e.clientX));
+            sidebar.style.width = newWidth + 'px';
+        });
+        document.addEventListener('mouseup', () => {
+            if (!resizing) return;
+            resizing = false;
+            document.body.classList.remove('sidebar-resizing');
+            map.invalidateSize();
         });
     }
 

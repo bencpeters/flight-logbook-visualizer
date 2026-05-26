@@ -93,6 +93,26 @@ body {
     transform: translateX(100%);
 }
 
+#sidebar-resize-handle {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 1002;
+}
+
+#sidebar-resize-handle:hover,
+#sidebar-resize-handle:active {
+    background: rgba(37, 99, 235, 0.3);
+}
+
+body.sidebar-resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
 #sidebar-toggle {
     position: absolute;
     left: -32px;

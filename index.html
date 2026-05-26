@@ -33,6 +33,7 @@
 
             <!-- Sidebar -->
             <div id="sidebar" class="open">
+                <div id="sidebar-resize-handle"></div>
                 <button id="sidebar-toggle" title="Toggle sidebar">&#9664;</button>
                 <div id="sidebar-content">
                     <!-- Tabs -->
@@ -54,7 +55,11 @@
                             </div>
                         </div>
                         <div class="filter-group">
-                            <label>Aircraft</label>
+                            <label>Aircraft Type</label>
+                            <select id="filter-aircraft-type" multiple></select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Aircraft (Tail #)</label>
                             <select id="filter-aircraft" multiple></select>
                         </div>
                         <div class="filter-group">
@@ -112,6 +117,10 @@
                         <div class="chart-wrapper">
                             <h4>Monthly Hours</h4>
                             <canvas id="monthly-chart"></canvas>
+                        </div>
+                        <div class="chart-wrapper">
+                            <h4>Hours by Aircraft Type</h4>
+                            <canvas id="type-chart"></canvas>
                         </div>
                     </div>
 
