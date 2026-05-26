@@ -718,7 +718,19 @@
                 tab.classList.add('active');
                 document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
                 if (tab.dataset.tab === 'graph') renderGraphs();
+                // On mobile, open sidebar when a tab is clicked
+                const sidebar = document.getElementById('sidebar');
+                if (!sidebar.classList.contains('open') && window.innerWidth <= 768) {
+                    sidebar.classList.add('open');
+                    setTimeout(() => map.invalidateSize(), 350);
+                }
             });
+        });
+
+        // Mobile close button
+        document.getElementById('mobile-close-btn').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.remove('open');
+            setTimeout(() => map.invalidateSize(), 350);
         });
 
 

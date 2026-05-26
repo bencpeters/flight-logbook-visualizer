@@ -101,6 +101,10 @@ body {
     transform: translateX(100%);
 }
 
+#mobile-close-btn {
+    display: none;
+}
+
 #sidebar-resize-handle {
     position: absolute;
     left: 0;
@@ -603,11 +607,10 @@ select[multiple] {
 @media (max-width: 768px) {
     #sidebar {
         width: 100% !important;
-        height: 55vh;
+        height: 100vh;
         top: auto;
         bottom: 0;
         right: 0;
-        border-radius: 16px 16px 0 0;
         transition: transform 0.3s ease;
     }
 
@@ -616,55 +619,64 @@ select[multiple] {
     }
 
     #sidebar:not(.open) {
-        transform: translateY(calc(100% - 40px));
+        transform: translateY(calc(100% - 44px));
     }
 
     #sidebar-toggle {
-        left: 50%;
-        top: -18px;
-        transform: translateX(-50%);
-        width: 48px;
-        height: 36px;
-        border-radius: 8px 8px 0 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    #sidebar.open #sidebar-toggle::after {
-        content: '\25BC';
-    }
-
-    #sidebar:not(.open) #sidebar-toggle::after {
-        content: '\25B2';
+        display: none;
     }
 
     #sidebar-resize-handle {
         display: none;
     }
 
-    /* Show a persistent tab bar when sidebar is closed */
-    #sidebar:not(.open) #sidebar-content {
-        visibility: hidden;
+    /* Tab bar always visible at bottom */
+    .tabs {
+        order: -1;
     }
 
-    #sidebar:not(.open) .tabs {
-        visibility: visible;
+    #sidebar:not(.open) #sidebar-content {
+        display: flex;
+        flex-direction: column;
+    }
+
+    #sidebar:not(.open) .tab-panel {
+        display: none !important;
+    }
+
+    #sidebar:not(.open) #data-toolbar {
+        display: none;
+    }
+
+    #sidebar:not(.open) #mobile-close-btn {
+        display: none;
+    }
+
+    /* Mobile close button */
+    #mobile-close-btn {
+        display: block;
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
+        top: 8px;
+        right: 12px;
+        border: none;
+        background: none;
+        font-size: 1.6rem;
+        cursor: pointer;
+        color: #555;
+        z-index: 10;
+        line-height: 1;
+        padding: 4px 8px;
     }
 
     #flight-detail {
         width: calc(100% - 20px);
         left: 10px;
-        bottom: 57vh;
+        bottom: 60px;
         max-height: 200px;
     }
 
     #map-legend {
-        bottom: 58vh;
+        bottom: 56px;
         font-size: 0.65rem;
         padding: 4px 10px;
     }
