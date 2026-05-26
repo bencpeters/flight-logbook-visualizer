@@ -334,6 +334,7 @@
     let cumulativeChart = null;
     let monthlyChart = null;
     let typeChart = null;
+    let airportsChart = null;
 
     // Custom plugin for drag-to-select date range
     const dragSelectPlugin = {
@@ -544,6 +545,42 @@
                         }
                     }
                 }
+            }
+        });
+
+        // Top airports chart
+        if (airportsChart) airportsChart.destroy();
+        const airportCounts = {};
+        filteredFlights.forEach(f => {
+            if (f.from) airportCounts[f.from] = (airportCounts[f.from] || 0) + 1;
+            if (f.to && f.to !== f.from) airportCounts[f.to] = (airportCounts[f.to] || 0) + 1;
+        });
+        const topAirports = Object.entries(airportCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 15);
+        const apLabels = topAirports.map(([id]) => id);
+        const apValues = topAirports.map(([, count]) => count);
+
+        airportsChart = new Chart(document.getElementById('airports-chart'), {
+            type: 'bar',
+            data: {
+                labels: apLabels,
+                datasets: [{
+                    label: 'Visits',
+                    data: apValues,
+                    backgroundColor: '#4f9e6b',
+                    borderRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: { title: { display: true, text: 'Flights' }, beginAtZero: true },
+                    y: { ticks: { font: { size: 11 } } }
+                },
+                plugins: { legend: { display: false } }
             }
         });
     }
