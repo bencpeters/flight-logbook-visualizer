@@ -331,73 +331,154 @@
     }
 
     // --- Graph ---
-    function renderGraph(type) {
-        const ctx = document.getElementById('hours-chart');
-        if (chart) chart.destroy();
+    let cumulativeChart = null;
+    let monthlyChart = null;
+
+    // Custom plugin for drag-to-select date range
+    const dragSelectPlugin = {
+        id: 'dragSelect',
+        beforeInit(chart) {
+            chart.dragSelect = { dragging: false, startX: null, endX: null };
+        },
+        afterEvent(chart, args) {
+            const { event } = args;
+            const ds = chart.dragSelect;
+            const area = chart.chartArea;
+            if (!area) return;
+
+            if (event.type === 'mousedown' && event.x >= area.left && event.x <= area.right && event.y >= area.top && event.y <= area.bottom) {
+                ds.dragging = true;
+                ds.startX = event.x;
+                ds.endX = event.x;
+            } else if (event.type === 'mousemove' && ds.dragging) {
+                ds.endX = Math.max(area.left, Math.min(event.x, area.right));
+                chart.draw();
+            } else if (event.type === 'mouseup' && ds.dragging) {
+                ds.dragging = false;
+                const minX = Math.min(ds.startX, ds.endX);
+                const maxX = Math.max(ds.startX, ds.endX);
+                if (maxX - minX > 10) {
+                    const scale = chart.scales.x;
+                    const minVal = scale.getValueForPixel(minX);
+                    const maxVal = scale.getValueForPixel(maxX);
+                    applyDateFilterFromChart(minVal, maxVal, scale.type);
+                }
+                ds.startX = null;
+                ds.endX = null;
+                chart.draw();
+            }
+        },
+        afterDraw(chart) {
+            const ds = chart.dragSelect;
+            if (!ds.dragging || ds.startX === null) return;
+            const { ctx, chartArea } = chart;
+            const minX = Math.min(ds.startX, ds.endX);
+            const maxX = Math.max(ds.startX, ds.endX);
+            ctx.save();
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.15)';
+            ctx.strokeStyle = 'rgba(37, 99, 235, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.fillRect(minX, chartArea.top, maxX - minX, chartArea.bottom - chartArea.top);
+            ctx.strokeRect(minX, chartArea.top, maxX - minX, chartArea.bottom - chartArea.top);
+            ctx.restore();
+        }
+    };
+
+    function applyDateFilterFromChart(minVal, maxVal, scaleType) {
+        const fromDate = new Date(minVal).toISOString().substring(0, 10);
+        const toDate = new Date(maxVal).toISOString().substring(0, 10);
+        document.getElementById('filter-date-from').value = fromDate;
+        document.getElementById('filter-date-to').value = toDate;
+        applyFilters();
+    }
+
+    function renderGraphs() {
+        if (cumulativeChart) cumulativeChart.destroy();
+        if (monthlyChart) monthlyChart.destroy();
 
         const sorted = [...filteredFlights].filter(f => f.totalTime > 0).sort((a, b) => a.date.localeCompare(b.date));
+        if (sorted.length === 0) return;
 
-        if (type === 'cumulative') {
-            let cumulative = 0;
-            const data = sorted.map(f => {
-                cumulative += f.totalTime;
-                return { x: f.date, y: Math.round(cumulative * 10) / 10 };
-            });
+        // Cumulative chart
+        let cumulative = 0;
+        const cumulativeData = sorted.map(f => {
+            cumulative += f.totalTime;
+            return { x: f.date, y: Math.round(cumulative * 10) / 10 };
+        });
 
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    datasets: [{
-                        label: 'Total Hours',
-                        data: data,
-                        borderColor: '#2563eb',
-                        backgroundColor: 'rgba(37,99,235,0.1)',
-                        fill: true,
-                        pointRadius: 1,
-                        tension: 0.1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: { type: 'category', title: { display: true, text: 'Date' }, ticks: { maxTicksLimit: 12 } },
-                        y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
+        cumulativeChart = new Chart(document.getElementById('cumulative-chart'), {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Total Hours',
+                    data: cumulativeData,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,0.1)',
+                    fill: true,
+                    pointRadius: 0,
+                    pointHitRadius: 6,
+                    tension: 0.1,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { unit: 'year', tooltipFormat: 'MMM yyyy' },
+                        title: { display: false }
                     },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        } else {
-            // Monthly bar chart
-            const monthly = {};
-            sorted.forEach(f => {
-                const month = f.date.substring(0, 7);
-                monthly[month] = (monthly[month] || 0) + f.totalTime;
-            });
-
-            const labels = Object.keys(monthly).sort();
-            const values = labels.map(m => Math.round(monthly[m] * 10) / 10);
-
-            chart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Hours',
-                        data: values,
-                        backgroundColor: '#2563eb',
-                        borderRadius: 2
-                    }]
+                    y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
                 },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: { title: { display: true, text: 'Month' }, ticks: { maxTicksLimit: 18 } },
-                        y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { title: (items) => items[0]?.raw?.x || '' } }
+                },
+                events: ['mousedown', 'mousemove', 'mouseup', 'mouseleave']
+            },
+            plugins: [dragSelectPlugin]
+        });
+
+        // Monthly bar chart
+        const monthly = {};
+        sorted.forEach(f => {
+            const month = f.date.substring(0, 7) + '-01';
+            monthly[month] = (monthly[month] || 0) + f.totalTime;
+        });
+
+        const monthKeys = Object.keys(monthly).sort();
+        const monthlyData = monthKeys.map(m => ({ x: m, y: Math.round(monthly[m] * 10) / 10 }));
+
+        monthlyChart = new Chart(document.getElementById('monthly-chart'), {
+            type: 'bar',
+            data: {
+                datasets: [{
+                    label: 'Hours',
+                    data: monthlyData,
+                    backgroundColor: '#2563eb',
+                    borderRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { unit: 'month', tooltipFormat: 'MMM yyyy' },
+                        title: { display: false },
+                        offset: true
                     },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        }
+                    y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
+                },
+                plugins: { legend: { display: false } },
+                events: ['mousedown', 'mousemove', 'mouseup', 'mouseleave']
+            },
+            plugins: [dragSelectPlugin]
+        });
     }
 
     // --- Stats ---
@@ -503,8 +584,7 @@
         plotRoutes();
         renderTable();
         renderStats();
-        const activeGraph = document.querySelector('.graph-controls .btn-sm.active');
-        if (activeGraph) renderGraph(activeGraph.dataset.graph);
+        renderGraphs();
     }
 
     // --- UI Wiring ---
@@ -522,21 +602,11 @@
                 document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
                 tab.classList.add('active');
                 document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
-                if (tab.dataset.tab === 'graph') {
-                    const activeGraph = document.querySelector('.graph-controls .btn-sm.active');
-                    renderGraph(activeGraph ? activeGraph.dataset.graph : 'cumulative');
-                }
+                if (tab.dataset.tab === 'graph') renderGraphs();
             });
         });
 
-        // Graph toggle
-        document.querySelectorAll('.graph-controls .btn-sm').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.graph-controls .btn-sm').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                renderGraph(btn.dataset.graph);
-            });
-        });
+
 
         // Table sorting
         document.querySelectorAll('#flights-table th').forEach(th => {
