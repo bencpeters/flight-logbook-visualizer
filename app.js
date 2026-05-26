@@ -104,22 +104,19 @@
         const vfrSectionalLayer = L.tileLayer('https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'FAA Aeronautical Information Services',
             maxZoom: 12,
-            minZoom: 8,
-            crossOrigin: 'anonymous'
+            minZoom: 8
         });
 
         const vfrTerminalLayer = L.tileLayer('https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Terminal/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'FAA Aeronautical Information Services',
             maxZoom: 14,
-            minZoom: 10,
-            crossOrigin: 'anonymous'
+            minZoom: 10
         });
 
         const ifrLowLayer = L.tileLayer('https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/IFR_AreaLow/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'FAA Aeronautical Information Services',
             maxZoom: 12,
-            minZoom: 6,
-            crossOrigin: 'anonymous'
+            minZoom: 6
         });
 
         osmLayer.addTo(map);
