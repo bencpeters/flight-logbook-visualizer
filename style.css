@@ -400,33 +400,44 @@ select[multiple] {
     flex-shrink: 0;
 }
 
-#panel-graph {
-    display: none;
-    flex-direction: column;
-}
-
-#panel-graph.active {
+.graph-subtabs {
     display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
 }
 
-.chart-wrapper {
+.graph-subtab {
+    padding: 5px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: #555;
+    transition: all 0.15s;
+}
+
+.graph-subtab.active {
+    background: #2563eb;
+    color: #fff;
+    border-color: #2563eb;
+}
+
+.chart-pane {
+    display: none;
     flex: 1;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
     position: relative;
 }
 
-.chart-wrapper h4 {
-    font-size: 0.8rem;
-    color: #555;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
+.chart-pane.active {
+    display: flex;
+    flex-direction: column;
 }
 
-.chart-wrapper canvas {
+.chart-pane canvas {
     width: 100% !important;
     flex: 1;
     min-height: 0;
@@ -690,9 +701,14 @@ select[multiple] {
         height: 70px;
     }
 
-    /* Graph panel */
-    .chart-wrapper canvas {
-        min-height: 120px !important;
+    /* Graph subtabs */
+    .graph-subtabs {
+        gap: 3px;
+    }
+
+    .graph-subtab {
+        font-size: 0.7rem;
+        padding: 4px 8px;
     }
 
     /* Stats */

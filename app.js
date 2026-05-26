@@ -421,168 +421,145 @@
     }
 
     function renderGraphs() {
-        if (cumulativeChart) cumulativeChart.destroy();
-        if (monthlyChart) monthlyChart.destroy();
+        if (cumulativeChart) { cumulativeChart.destroy(); cumulativeChart = null; }
+        if (monthlyChart) { monthlyChart.destroy(); monthlyChart = null; }
+        if (typeChart) { typeChart.destroy(); typeChart = null; }
+        if (airportsChart) { airportsChart.destroy(); airportsChart = null; }
         updateGraphDateIndicator();
+
+        const activePane = document.querySelector('.graph-subtab.active');
+        const activeGraph = activePane ? activePane.dataset.graph : 'cumulative';
 
         const sorted = [...filteredFlights].filter(f => f.totalTime > 0).sort((a, b) => a.date.localeCompare(b.date));
         if (sorted.length === 0) return;
 
-        // Cumulative chart
-        let cumulative = 0;
-        const cumulativeData = sorted.map(f => {
-            cumulative += f.totalTime;
-            return { x: f.date, y: Math.round(cumulative * 10) / 10 };
-        });
-
-        cumulativeChart = new Chart(document.getElementById('cumulative-chart'), {
-            type: 'line',
-            data: {
-                datasets: [{
-                    label: 'Total Hours',
-                    data: cumulativeData,
-                    borderColor: '#2563eb',
-                    backgroundColor: 'rgba(37,99,235,0.1)',
-                    fill: true,
-                    pointRadius: 0,
-                    pointHitRadius: 6,
-                    tension: 0.1,
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: { unit: 'year', tooltipFormat: 'MMM yyyy' },
-                        title: { display: false }
+        if (activeGraph === 'cumulative') {
+            let cumulative = 0;
+            const cumulativeData = sorted.map(f => {
+                cumulative += f.totalTime;
+                return { x: f.date, y: Math.round(cumulative * 10) / 10 };
+            });
+            cumulativeChart = new Chart(document.getElementById('cumulative-chart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Total Hours',
+                        data: cumulativeData,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,0.1)',
+                        fill: true,
+                        pointRadius: 0,
+                        pointHitRadius: 6,
+                        tension: 0.1,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { type: 'time', time: { unit: 'year', tooltipFormat: 'MMM yyyy' }, title: { display: false } },
+                        y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
                     },
-                    y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { callbacks: { title: (items) => items[0]?.raw?.x || '' } }
-                },
-                events: ['mousedown', 'mousemove', 'mouseup', 'mouseleave']
-            },
-            plugins: [dragSelectPlugin]
-        });
-
-        // Monthly bar chart
-        const monthly = {};
-        sorted.forEach(f => {
-            const month = f.date.substring(0, 7) + '-01';
-            monthly[month] = (monthly[month] || 0) + f.totalTime;
-        });
-
-        const monthKeys = Object.keys(monthly).sort();
-        const monthlyData = monthKeys.map(m => ({ x: m, y: Math.round(monthly[m] * 10) / 10 }));
-
-        monthlyChart = new Chart(document.getElementById('monthly-chart'), {
-            type: 'bar',
-            data: {
-                datasets: [{
-                    label: 'Hours',
-                    data: monthlyData,
-                    backgroundColor: '#2563eb',
-                    borderRadius: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: { unit: 'month', tooltipFormat: 'MMM yyyy' },
-                        title: { display: false },
-                        offset: true
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { title: (items) => items[0]?.raw?.x || '' } }
                     },
-                    y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
+                    events: ['mousedown', 'mousemove', 'mouseup', 'mouseleave']
                 },
-                plugins: { legend: { display: false } },
-                events: ['mousedown', 'mousemove', 'mouseup', 'mouseleave']
-            },
-            plugins: [dragSelectPlugin]
-        });
+                plugins: [dragSelectPlugin]
+            });
+        }
 
-        // Aircraft type chart
-        if (typeChart) typeChart.destroy();
-        const byType = {};
-        filteredFlights.forEach(f => {
-            const t = getAircraftType(f.aircraft) || 'Unknown';
-            byType[t] = (byType[t] || 0) + f.totalTime;
-        });
-        const typeLabels = Object.keys(byType).sort((a, b) => byType[b] - byType[a]);
-        const typeValues = typeLabels.map(t => Math.round(byType[t] * 10) / 10);
-        const typeColors = typeLabels.map((_, i) => {
-            const hue = (i * 137.5) % 360;
-            return `hsl(${hue}, 55%, 55%)`;
-        });
+        if (activeGraph === 'monthly') {
+            const monthly = {};
+            sorted.forEach(f => {
+                const month = f.date.substring(0, 7) + '-01';
+                monthly[month] = (monthly[month] || 0) + f.totalTime;
+            });
+            const monthKeys = Object.keys(monthly).sort();
+            const monthlyData = monthKeys.map(m => ({ x: m, y: Math.round(monthly[m] * 10) / 10 }));
+            monthlyChart = new Chart(document.getElementById('monthly-chart'), {
+                type: 'bar',
+                data: {
+                    datasets: [{
+                        label: 'Hours',
+                        data: monthlyData,
+                        backgroundColor: '#2563eb',
+                        borderRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'time', time: { unit: 'month', tooltipFormat: 'MMM yyyy' }, title: { display: false }, offset: true },
+                        y: { title: { display: true, text: 'Hours' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { display: false } },
+                    events: ['mousedown', 'mousemove', 'mouseup', 'mouseleave']
+                },
+                plugins: [dragSelectPlugin]
+            });
+        }
 
-        typeChart = new Chart(document.getElementById('type-chart'), {
-            type: 'doughnut',
-            data: {
-                labels: typeLabels,
-                datasets: [{
-                    data: typeValues,
-                    backgroundColor: typeColors,
-                    borderWidth: 1,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => `${ctx.label}: ${ctx.raw}h`
-                        }
+        if (activeGraph === 'type') {
+            const byType = {};
+            filteredFlights.forEach(f => {
+                const t = getAircraftType(f.aircraft) || 'Unknown';
+                byType[t] = (byType[t] || 0) + f.totalTime;
+            });
+            const typeLabels = Object.keys(byType).sort((a, b) => byType[b] - byType[a]);
+            const typeValues = typeLabels.map(t => Math.round(byType[t] * 10) / 10);
+            const typeColors = typeLabels.map((_, i) => {
+                const hue = (i * 137.5) % 360;
+                return `hsl(${hue}, 55%, 55%)`;
+            });
+            typeChart = new Chart(document.getElementById('type-chart'), {
+                type: 'doughnut',
+                data: {
+                    labels: typeLabels,
+                    datasets: [{ data: typeValues, backgroundColor: typeColors, borderWidth: 1, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}h` } }
                     }
                 }
-            }
-        });
+            });
+        }
 
-        // Top airports chart
-        if (airportsChart) airportsChart.destroy();
-        const airportCounts = {};
-        filteredFlights.forEach(f => {
-            if (f.from) airportCounts[f.from] = (airportCounts[f.from] || 0) + 1;
-            if (f.to && f.to !== f.from) airportCounts[f.to] = (airportCounts[f.to] || 0) + 1;
-        });
-        const topAirports = Object.entries(airportCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 15);
-        const apLabels = topAirports.map(([id]) => id);
-        const apValues = topAirports.map(([, count]) => count);
-
-        airportsChart = new Chart(document.getElementById('airports-chart'), {
-            type: 'bar',
-            data: {
-                labels: apLabels,
-                datasets: [{
-                    label: 'Visits',
-                    data: apValues,
-                    backgroundColor: '#4f9e6b',
-                    borderRadius: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: 'y',
-                scales: {
-                    x: { title: { display: true, text: 'Flights' }, beginAtZero: true },
-                    y: { ticks: { font: { size: 11 } } }
+        if (activeGraph === 'airports') {
+            const airportCounts = {};
+            filteredFlights.forEach(f => {
+                if (f.from) airportCounts[f.from] = (airportCounts[f.from] || 0) + 1;
+                if (f.to && f.to !== f.from) airportCounts[f.to] = (airportCounts[f.to] || 0) + 1;
+            });
+            const topAirports = Object.entries(airportCounts).sort((a, b) => b[1] - a[1]).slice(0, 15);
+            const apLabels = topAirports.map(([id]) => id);
+            const apValues = topAirports.map(([, count]) => count);
+            airportsChart = new Chart(document.getElementById('airports-chart'), {
+                type: 'bar',
+                data: {
+                    labels: apLabels,
+                    datasets: [{ label: 'Visits', data: apValues, backgroundColor: '#4f9e6b', borderRadius: 2 }]
                 },
-                plugins: { legend: { display: false } }
-            }
-        });
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: { title: { display: true, text: 'Flights' }, beginAtZero: true },
+                        y: { ticks: { font: { size: 11 } } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
     }
 
     // --- Stats ---
@@ -733,7 +710,16 @@
             setTimeout(() => map.invalidateSize(), 350);
         });
 
-
+        // Graph subtabs
+        document.querySelectorAll('.graph-subtab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.graph-subtab').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.chart-pane').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('chart-' + btn.dataset.graph).classList.add('active');
+                renderGraphs();
+            });
+        });
 
         // Table sorting
         document.querySelectorAll('#flights-table th').forEach(th => {
