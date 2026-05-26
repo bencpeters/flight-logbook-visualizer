@@ -750,8 +750,41 @@
         });
         document.getElementById('btn-clear-data').addEventListener('click', clearData);
 
-        // Sidebar resize
+        // Swipe down to close sidebar on mobile
         const sidebar = document.getElementById('sidebar');
+        let touchStartY = null;
+        let touchCurrentY = null;
+
+        sidebar.addEventListener('touchstart', (e) => {
+            if (window.innerWidth > 768 || !sidebar.classList.contains('open')) return;
+            touchStartY = e.touches[0].clientY;
+            touchCurrentY = touchStartY;
+        }, { passive: true });
+
+        sidebar.addEventListener('touchmove', (e) => {
+            if (touchStartY === null) return;
+            touchCurrentY = e.touches[0].clientY;
+            const dy = touchCurrentY - touchStartY;
+            if (dy > 0) {
+                sidebar.style.transition = 'none';
+                sidebar.style.transform = `translateY(${dy}px)`;
+            }
+        }, { passive: true });
+
+        sidebar.addEventListener('touchend', () => {
+            if (touchStartY === null) return;
+            const dy = touchCurrentY - touchStartY;
+            sidebar.style.transition = '';
+            sidebar.style.transform = '';
+            if (dy > 80) {
+                sidebar.classList.remove('open');
+                setTimeout(() => map.invalidateSize(), 350);
+            }
+            touchStartY = null;
+            touchCurrentY = null;
+        });
+
+        // Sidebar resize
         const resizeHandle = document.getElementById('sidebar-resize-handle');
         let resizing = false;
         resizeHandle.addEventListener('mousedown', (e) => {
