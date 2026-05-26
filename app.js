@@ -742,6 +742,15 @@
             document.getElementById('flight-detail').classList.add('hidden');
         });
 
+        // Data management buttons
+        const reloadInput = document.getElementById('file-input-reload');
+        document.getElementById('btn-load-new').addEventListener('click', () => reloadInput.click());
+        reloadInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) loadFile(e.target.files[0]);
+            reloadInput.value = '';
+        });
+        document.getElementById('btn-clear-data').addEventListener('click', clearData);
+
         // Sidebar resize
         const sidebar = document.getElementById('sidebar');
         const resizeHandle = document.getElementById('sidebar-resize-handle');
@@ -793,17 +802,48 @@
     function loadFile(file) {
         const reader = new FileReader();
         reader.onload = (e) => {
-            parseForeFlight(e.target.result);
-            document.getElementById('upload-screen').classList.add('hidden');
-            document.getElementById('main-app').classList.remove('hidden');
-            initMap();
-            setupUI();
-            populateFilters();
-            updateAll();
+            loadCsvData(e.target.result);
         };
         reader.readAsText(file);
     }
 
+    function loadCsvData(csvText) {
+        try {
+            localStorage.setItem('ff_logbook_csv', csvText);
+        } catch (e) {
+            // localStorage full or unavailable — continue without caching
+        }
+        parseForeFlight(csvText);
+        document.getElementById('upload-screen').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        if (!map) {
+            initMap();
+            setupUI();
+        }
+        populateFilters();
+        updateAll();
+    }
+
+    function clearData() {
+        localStorage.removeItem('ff_logbook_csv');
+        flights = [];
+        filteredFlights = [];
+        aircraft = {};
+        if (map) { map.remove(); map = null; }
+        if (cumulativeChart) { cumulativeChart.destroy(); cumulativeChart = null; }
+        if (monthlyChart) { monthlyChart.destroy(); monthlyChart = null; }
+        if (typeChart) { typeChart.destroy(); typeChart = null; }
+        if (airportsChart) { airportsChart.destroy(); airportsChart = null; }
+        document.getElementById('main-app').classList.add('hidden');
+        document.getElementById('upload-screen').classList.remove('hidden');
+    }
+
     // --- Init ---
     setupUpload();
+
+    // Load from localStorage if available
+    const cached = localStorage.getItem('ff_logbook_csv');
+    if (cached) {
+        loadCsvData(cached);
+    }
 })();

@@ -145,6 +145,15 @@ body.sidebar-resizing {
     overflow: hidden;
 }
 
+/* Data toolbar */
+#data-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
 /* Tabs */
 .tabs {
     display: flex;
